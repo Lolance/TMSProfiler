@@ -6,7 +6,8 @@
 
     Public Sub Stopper_Click(sender As Object, e As EventArgs) Handles Stopper.Click
         TestS = vbNo
-        FastFix = vbNo
+        FastFix = vbYes
+        Deactivate_Trigger = vbNo
         Close()
     End Sub
 

@@ -1,4 +1,6 @@
-﻿Imports System.IO
+﻿Option Explicit On
+
+Imports System.IO
 Imports System.Net
 Imports Microsoft.Office.Interop.Outlook
 Imports Microsoft.Office
@@ -9,6 +11,7 @@ Imports System.Data.OleDb
 Imports System.Data
 Imports System.Collections
 Imports System.Text.RegularExpressions
+
 
 Public Module GlobalVariables
 
@@ -29,7 +32,7 @@ Public Module PresetValues
 
     Public Deactivate_Trigger As String = "No"
     Public Alt_Trigger As String = "TMQDATA"
-    Public Version As String = "22/10/2018 - Clean up"
+    Public Version As String = "11/01/2019 - Silly Mirek!"
     Public price As Integer = CInt(Math.Ceiling(Rnd() * 10)) + 1
     Public desktopchanger As String = vbYes
     Public DisplayModel As String = vbNo
@@ -64,7 +67,7 @@ End Module
 
 Public Class ThisAddIn
 
-    Public PR_SMTP_ADDRESS As String = "http://schemas.microsoft.com/mapi/proptag/0x39FE001E"
+    Private PR_SMTP_ADDRESS As String = "http://schemas.microsoft.com/mapi/proptag/0x39FE001E"
     Public WithEvents Items As Outlook.Items
     Public WithEvents Inspectors As Outlook.Inspectors
 
@@ -75,14 +78,23 @@ Public Class ThisAddIn
     End Function
 
     Public Sub WaitOnSend()
-        WaitingOnSend = "Yes"
-        Dim Counter As Long
-        For Counter = 0 To 10000
-            System.Windows.Forms.Application.DoEvents()
-        Next Counter
+        'WaitingOnSend = "Yes"
+        'Dim Counter As Long
+        'For Counter = 0 To 10000
+        '    System.Windows.Forms.Application.DoEvents()
+        'Next Counter
         WaitingOnSend = "No"
 
     End Sub
+
+    Public Sub LogStep(FileName As String, Thing As String)
+        If SVBI_Connection.State = 1 Then SVBI_Connection.Close()
+        SVBI_Connection.Open(SVBI_Risk)
+        SVBI_Execute_String = "INSERT INTO SVTS_Risk.Printer.ApplicationLogging (RunTime, RequestFile, RequestThing, User_Number) 
+							   VALUES (GETDATE(), '" & FileName & "', '" & Thing & "', '" & UNameWindows() & "')"
+        SVBI_Connection.Execute(SVBI_Execute_String)
+    End Sub
+
 
     Public Sub ThisAddIn_Startup(ByVal sender As Object, ByVal e As System.EventArgs) Handles Me.Startup
 Resetter:
@@ -114,22 +126,10 @@ Resetter:
 
     Public Sub TestZone()
         'Use this to test new functionality, DB pulls etc
+        TestStatus = "Test started"
 
-        reply_DQ = Application.CreateItem(Outlook.OlItemType.olMailItem)
-        reply_DQ.DeleteAfterSubmit = True
-        reply_DQ.To = UNameWindows()
-        reply_DQ.Subject = "[Unclassified: For Official Use Only] TMS Profiler: Test email"
-        reply_DQ.HTMLBody = "Diagnostics: <br><br>" & OnTime & "<br><br>" & "<b>Current trigger word: </b>" & codeword
-        reply_DQ.HTMLBody = reply_DQ.HTMLBody & "<br>Version: " & Version
-        reply_DQ.HTMLBody = reply_DQ.HTMLBody & "This automated email is a test email regarding new functionality to be rolled into the next release of the TMS Profiler"
-        reply_DQ.HTMLBody = reply_DQ.HTMLBody & "<br><br>"
 
-        'Start test code
-
-        'End test code
-        reply_DQ.Send()
-        Call WaitOnSend()
-        TestStatus = "Test passed!"
+        TestStatus = "Test passed"
     End Sub
     Public Sub Items_ItemAdd(ByVal item As Object) Handles Items.ItemAdd
         If WaitingOnSend = "Yes" Then Exit Sub
@@ -141,8 +141,6 @@ Resetter:
 
         If TypeOf (item) IsNot Outlook.MailItem Then Exit Sub
         Dim mail As Outlook.MailItem = item
-        'If mail.MessageClass IsNot IPM.Note Then Exit Sub
-
         Dim sender As Outlook.AddressEntry = mail.Sender
         Dim exchUser As Outlook.ExchangeUser = sender.GetExchangeUser()
 
@@ -154,7 +152,7 @@ exiter:
 
         On Error GoTo earlyexit
 
-        Subject = RTrim(LTrim(Replace(Replace(Subject, "<", ""), ">", "")))
+        Subject = RTrim(LTrim(Replace(Replace(mail.Subject, "<", ""), ">", "")))
 
         If mail.SenderEmailType = "EX" Then
             If sender IsNot Nothing Then
@@ -186,14 +184,73 @@ exiter:
 
         If ProfileOnly = 1 Then GoTo NoScan
 
+        'UPDATE CT
+        If Today.DayOfWeek <> DayOfWeek.Saturday And Today.DayOfWeek <> DayOfWeek.Sunday And ((Now().Hour >= 7 And Now().Minute > 15) Or (Now().Hour > 7)) Then
+            If SVDG_Connection.State = 1 Then SVDG_Connection.Close()
+            SVDG_Connection.Open(SVDG_CaseTracker)
+            SVDG_Execute_String = "Select Status From VPMS.dbo.vwStatusImportSVTSJob "
+            rs = SVDG_Connection.Execute(SVDG_Execute_String)
+            mv = rs("Status").Value
+            If mv = "Run" Then
+                Dim RequestItem As String = "Remote"
+                Dim FromPath As String = "\\education.vic.gov.au\share\TMO\Vet\Division VET\RTO Case Tracker\Production\"
+                Dim AccessDB As String = "VPMS.accde"
+                Dim Report As String = "[Import SVTS].ImportSVTSJob"
+                Dim RemoveDB As String = "No"
+                Dim ReplaceDB As String = "No"
+
+                Call CreateAccessReports(FromPath & AccessDB, AccessDB, Report, RequestItem, RemoveDB, ReplaceDB)
+                reply = Application.CreateItem(Outlook.OlItemType.olMailItem)
+                reply.DeleteAfterSubmit = True
+                reply.To = "crest.pamela.p@edumail.vic.gov.au; Guerrero.Jenny.T@edumail.vic.gov.au; kozdra.mirek.m@edumail.vic.gov.au"
+                reply.CC = UNameWindows()
+                If SVDG_Connection.State = 1 Then SVDG_Connection.Close()
+                SVDG_Connection.Open(SVDG_CaseTracker)
+                SVDG_Execute_String = "Select * From VPMS.dbo.vwStatusImportSVTSJob "
+                rs = SVDG_Connection.Execute(SVDG_Execute_String)
+                mv = rs("Result").Value
+                reply.Subject = "[Unclassified: For Official Use Only] Case Tracker Refresh: " & mv
+                If mv = "Success" Then
+                    reply.HTMLBody = "Update of case tracker data successful<br><br>"
+                Else
+                    reply.HTMLBody = "Update of case tracker data attempted and failed<br><br>"
+                    mv = rs("Detail").Value
+                    reply.HTMLBody = reply.HTMLBody & mv & "<br><hr><br>"
+                End If
+
+                'Add code to check course enrolment run
+                reply.HTMLBody = reply.HTMLBody & "Course enrolment update (for last night) "
+
+                If SVBI_Connection.State = 1 Then SVBI_Connection.Close()
+                SVBI_Connection.Open(SVBI_Risk)
+                SVBI_Execute_String = "SELECT RIGHT(CEL.StepDescription,LEN(CEL.StepDescription)-6) AS StepDescription, CEL.StepCompletionTime FROM svts.dbo.CourseEnrolmentLogging CEL  
+									   WHERE CAST(CEL.StepCompletionTime AS DATE) = CAST(GETDATE() AS DATE) AND CEL.StepDescription LIKE '%End%' AND CEL.ProcessName = 'CourseCompletionUpdate'"
+                SVBI_Connection.Execute(SVBI_Execute_String)
+                rs = SVBI_Connection.Execute(SVBI_Execute_String)
+                If rs.EOF Then
+                    reply.HTMLBody = reply.HTMLBody & "failed."
+                Else
+                    mv = rs("StepDescription").Value
+                    reply.HTMLBody = reply.HTMLBody & "finished successfully. <br>" & mv
+
+                    mv = rs("StepCompletionTime").Value
+                    reply.HTMLBody = reply.HTMLBody & " at " & mv & ".<br><hr><br>"
+
+                End If
+                reply.Send()
+            End If
+        End If
+
         'First trigger a check for automated emails needed (always do this)
-        If Today.DayOfWeek = DayOfWeek.Monday And Now().Hour >= 8 And Now().Minute > 30 Then
+        If Today.DayOfWeek = DayOfWeek.Monday And ((Now().Hour >= 7 And Now().Minute > 15) Or (Now().Hour > 7)) Then
             Call SVTS_BDACheck()
-        ElseIf Today.DayOfWeek = DayOfWeek.Friday And Now().Hour >= 8 And Now().Minute > 30 Then
+        ElseIf Today.DayOfWeek = DayOfWeek.Friday And ((Now().Hour >= 7 And Now().Minute > 15) Or (Now().Hour > 7)) Then
             Call SVTS_SUPLift()
         End If
-        If Now().Hour >= 8 Then Call SVTS_PaymentSpike()
-
+        If Now().Hour >= 7 Then Call SVTS_PaymentSpike()
+        If Subject = "Auto Email Trigger" Then
+            mail.Move(destfolder)
+        End If
         Dim CR As String
         CR = "renshaw.carol.l@edumail.vic.gov.au"
         Dim Siam As String = "Luangpithathorn"
@@ -399,7 +456,6 @@ earlyexit:
     End Sub
 
     Sub BDA_Loop()
-        'HERE
         SVBI_Execute_String = "SELECT b.* FROM SVTS_Risk.Printer.BDAFlags b left join svts_risk.ref.TAFE T on t.toid = b.toid WHERE T.Toid is null and b.informed LIKE '%no%' and b.Status like '%monitored%' and b.FlaggingReason != '' Order by b.Status asc, b.TOID asc"
         If SVBI_Connection_Persistant.State = 1 Then SVBI_Connection_Persistant.Close()
         SVBI_Connection_Persistant.Open(SVBI_Risk)
@@ -409,11 +465,7 @@ earlyexit:
             reply_DQ.HTMLBody = reply_DQ.HTMLBody & "<P STYLE='font-family:Calbri; font-size:14'><font color = 'darkred'><b>Non-TAFES of interest - currently flagged as 'Watch':</font>"
         End If
 
-        'On Error GoTo ErrorCatcher
-        If 1 = 1 Then
-
-            'On Error Resume Next
-            Do While Not rs_alt2.EOF
+        Do While Not rs_alt2.EOF
                 RiskQuickRun(rs_alt2.Fields("TOID").Value.ToString())
                 SVBI_Execute_String = "SELECT TOP 1 * FROM SVTS_Risk.Printer.PaymentFlags ADQ where toid = " & rs_alt2.Fields("TOID").Value.ToString() & " and logdate = '" & rs_alt2.Fields("LogDate").Value.ToString() & "'"
                 If SVBI_Connection_Alt.State = 1 Then SVBI_Connection_Alt.Close()
@@ -429,7 +481,7 @@ earlyexit:
                 reply_DQ.HTMLBody = reply_DQ.HTMLBody & "<br>"
                 rs_alt2.MoveNext()
             Loop
-        End If
+
         'Normal Status
         If SVBI_Connection_Persistant.State = 1 Then SVBI_Connection_Persistant.Close()
         SVBI_Connection_Persistant.Open(SVBI_Risk)
@@ -494,6 +546,7 @@ earlyexit:
         If Not rs_alt2.EOF Then
             reply_DQ.HTMLBody = reply_DQ.HTMLBody & "<P STYLE='font-family:Calbri; font-size:14'><font color = 'navy'><b>TAFEs of (potential) interest:</font>"
         End If
+
         'MsgBox("TAFE - N")
         Do While Not rs_alt2.EOF
             RiskQuickRun(rs_alt2.Fields("TOID").Value.ToString())
@@ -515,9 +568,9 @@ earlyexit:
     End Sub
     Sub SVTS_SUPLift()
 
-        'HERE
         Dim BaseString As String
         BaseString = "SELECT DISTINCT SL.TOID, SL.TradingName FROM SVTS_Risk.Printer.SupLift SL WHERE sl.Notified LIKE '%No%'"
+
         If SVBI_Connection_Persistant.State = 1 Then SVBI_Connection_Persistant.Close()
         SVBI_Connection_Persistant.Open(SVBI_Risk)
         rs_alt2 = SVBI_Connection_Persistant.Execute(BaseString)
@@ -526,8 +579,8 @@ earlyexit:
 
         reply_DQ = Application.CreateItem(Outlook.OlItemType.olMailItem)
         reply_DQ.DeleteAfterSubmit = True
-        reply_DQ.To = "purcell.myra.e@edumail.vic.gov.au"
-        reply_DQ.CC = UNameWindows()
+        reply_DQ.To = "perkal.kirra.k@edumail.vic.gov.au; chen.jasey.j@edumail.vic.gov.au; boldt.nicole.s@edumail.vic.gov.au; Bowditch.Terence.T@edumail.vic.gov.au"
+        reply_DQ.CC = UNameWindows() & " ;purcell.myra.e@edumail.vic.gov.au"
         reply_DQ.Subject = "[Unclassified: For Official Use Only] TMS Automated Summary: SUPLift"
         reply_DQ.HTMLBody = "<P STYLE='font-family:Calbri; font-size:12'>"
         reply_DQ.HTMLBody = reply_DQ.HTMLBody & "This automated email provides a break down of new (and old) activity under SUPLift <Br><BR>"
@@ -562,10 +615,28 @@ earlyexit:
         Loop
 
         reply_DQ.HTMLBody = reply_DQ.HTMLBody & "<br>If you have any questions, feel free to hit up Lance!"
+
+
+        ControlLocation = "\\education.vic.gov.au\SHARE\TMO\Projects\RTOUplift\"
+
+        currentfile = "TMQUplift_Starter.xlsm"
+        LogStep(currentfile, "Uplift")
+        Call ExcelFileLooper("UPP", currentfile, ControlLocation)
+        currentfile = "TMQUplift_Facts.xlsm"
+        LogStep(currentfile, "Uplift")
+        Call ExcelFileLooper("UPP", currentfile, ControlLocation)
+        currentfile = "TMQUplift_Controller.xlsm"
+        LogStep(currentfile, "Uplift")
+        Call ExcelFileLooper("UPP", currentfile, ControlLocation)
+
+        attachments = reply_DQ.Attachments
+        If File.Exists("\\Education.Vic.Gov.Au\SHARE\TMO\Projects\RTOUplift\Reports\" & Item_Found & "_Uplift.pdf") Then
+            attachments.Add("\\Education.Vic.Gov.Au\SHARE\TMO\Projects\RTOUplift\Reports\" & Item_Found & "_Uplift.pdf")
+        End If
+
         reply_DQ.Send()
         Call WaitOnSend()
 
-        'Clean Up
         If SVBI_Connection.State = 1 Then SVBI_Connection.Close()
         SVBI_Connection.Open(SVBI_Risk)
         SVBI_Execute_String = "Update SVTS_Risk.Printer.SupLift SET Notified = 'Yes' WHERE Notified like '%No%'"
@@ -641,12 +712,14 @@ earlyexit:
                 rs.MoveNext()
             Loop
 
-            reply_DQ.HTMLBody = reply_DQ.HTMLBody & "<BR><hr><P STYLE='font-family:Calbri; font-size:14'><b>New addition: Providers with registration ending soon </b><P STYLE='font-family:Calbri; font-size:12'><br>"
+            reply_DQ.HTMLBody = reply_DQ.HTMLBody & "<BR><hr><P STYLE='font-family:Calbri; font-size:14'><b>Providers with registration ending soon </b><P STYLE='font-family:Calbri; font-size:12'>"
             If SVBI_Connection.State = 1 Then SVBI_Connection.Close()
             SVBI_Connection.Open(SVBI_Risk)
-            SVBI_Execute_String = "SELECT 'Rating ' + CASE WHEN o.RegistrationStatus NOT IN ('Current','Current (Re-registration pending)') THEN 'High' 
+            SVBI_Execute_String = "SELECT 
+'' + CASE WHEN o.RegistrationStatus NOT IN ('Current','Current (Re-registration pending)') AND e.CurrentStudents > 0 THEN 'Critical' 
+WHEN o.RegistrationStatus NOT IN ('Current','Current (Re-registration pending)') THEN 'High' 
 WHEN o.RegistrationStatus IN ('Current (Re-registration pending)') THEN 'Medium'
-ELSE 'Low' END + ': ' +
+ELSE 'Low' END + ': ' AS Criticality,
 	   E.TradingName + ' (' + CAST(E.TOID AS VARCHAR(MAX)) +')<br>' +'
 	   Status: ' + RegistrationStatus + ' - (end date: ' +  CAST(E.TGA_ExpiryDate AS VARCHAR(MAX)) + ', ' + CAST(DaysToExpiry AS VARCHAR(MAX)) + ')<br> 
 	   Current students: ' + CAST(E.CurrentStudents AS VARCHAR(MAX)) + '<br>
@@ -656,14 +729,21 @@ INNER JOIN SVTS_TGA.dbo.Organisation o ON o.OrganisationCode = e.TOID
 LEFT JOIN [SVTS_TGA].[dbo].[RTORegistrationPeriod] rrp ON rrp.OrganisationID = o.OrganisationID AND rrp.EndDate = e.TGA_ExpiryDate
 ORDER BY CASE WHEN o.RegistrationStatus NOT IN ('Current','Current (Re-registration pending)') THEN 1
 WHEN o.RegistrationStatus IN ('Current (Re-registration pending)') THEN 2
-ELSE 3 END  ASC"
+ELSE 3 END asc, E.DaysToExpiry ASC"
             rs = SVBI_Connection.Execute(SVBI_Execute_String)
 
             Do While Not rs.EOF
-
+                If rs.Fields("Criticality").Value.ToString() = "Critical: " Then
+                    reply_DQ.HTMLBody = reply_DQ.HTMLBody & "<B><font color='red'>" & rs.Fields("Criticality").Value.ToString() & "</B></font> "
+                ElseIf rs.Fields("Criticality").Value.ToString() = "Medium: " Then
+                    reply_DQ.HTMLBody = reply_DQ.HTMLBody & "<B><font color='orange'>" & rs.Fields("Criticality").Value.ToString() & "</B></font> "
+                Else
+                    reply_DQ.HTMLBody = reply_DQ.HTMLBody & "<B><font color='indigo'>" & rs.Fields("Criticality").Value.ToString() & "</B></font> "
+                End If
                 reply_DQ.HTMLBody = reply_DQ.HTMLBody & rs.Fields("CareFactor").Value.ToString()
                 rs.MoveNext()
             Loop
+
 
             reply_DQ.HTMLBody = reply_DQ.HTMLBody & "<hr><P STYLE='font-family:Calbri; font-size:12'><br>If you have any questions, feel free to hit up Lance!"
             reply_DQ.Send()
@@ -854,7 +934,6 @@ ELSE 3 END  ASC"
         Dim Report As String = "OutputRpt"
         Dim RemoveDB As String = "Yes"
         Dim ReplaceDB As String = "No"
-
         SVDG_Execute_String = "SELECT DISTINCT TOID FROM VPMS.dbo.RTOCase_Case WHERE TOID = " & RequestItem
         Call SVDG_Check(SVDG_Execute_String)
         If RequestItemCheck = RequestItem Then
@@ -872,7 +951,6 @@ ELSE 3 END  ASC"
         Dim RemoveDB As String = "Yes"
         Dim ReplaceDB As String = "No"
         Dim RequestItem As String = ""
-
         Call CreateAccessReports(FromPath & AccessDB, AccessDB, Report, RequestItem, RemoveDB, ReplaceDB)
 
     End Sub
@@ -889,6 +967,7 @@ ELSE 3 END  ASC"
     End Sub
 
     Sub CreateAccessReports(FromPath As String, AccessDB As String, Report As String, RequestItem As String, RemoveDB As String, ReplaceDB As String)
+        LogStep(AccessDB & "_" & Report, RequestItem)
 
         Dim sKill As String
         Dim nnn As Integer = 0
@@ -939,7 +1018,7 @@ AccessProblem:
     End Sub
 
     Sub ExcelFileLooper(RequestItem As String, CurrentFile As String, ControlLocation As String)
-
+        LogStep(CurrentFile, RequestItem)
         Dim sKill As String
         Dim xxx As Integer = 0
         Dim FromPath As String
@@ -1012,89 +1091,6 @@ AccessProblem:
         Loop
     End Sub
 
-    'Sub Create2018Profile(RequestItem As String, EmailName As String)
-    '
-    '    CreateCaseHistories(RequestItem, "NoEmail")
-    '    CreateCERS(RequestItem)
-    '    ControlLocation = "\\education.vic.gov.au\SHARE\TMO\Projects\2017_PSP\ControlItems\"
-    '
-    '    currentfile = "2018_PSP_Control.xlsm"
-    '    Call ExcelFileLooper(RequestItem, currentfile, ControlLocation)
-    '    currentfile = "2018_PSP_Regionality.xlsm"
-    '    Call ExcelFileLooper(RequestItem, currentfile, ControlLocation)
-    '    currentfile = "2018_PSP_Regionality_PDPs.xlsm"
-    '    Call ExcelFileLooper(RequestItem, currentfile, ControlLocation)
-    '    currentfile = "2018_PSP_StateData.xlsm"
-    '    Call ExcelFileLooper(RequestItem, currentfile, ControlLocation)
-    '    currentfile = "2018_PSP_SurveyDetails.xlsm"
-    '    Call ExcelFileLooper(RequestItem, currentfile, ControlLocation)
-    '    currentfile = "2018_PSP_One.xlsm"
-    '    Call ExcelFileLooper(RequestItem, currentfile, ControlLocation)
-    '    currentfile = "2018_PSP_Two.xlsm"
-    '    Call ExcelFileLooper(RequestItem, currentfile, ControlLocation)
-    '    currentfile = "2018_PSP_Three.xlsm"
-    '    Call ExcelFileLooper(RequestItem, currentfile, ControlLocation)
-    '    currentfile = "2018_PSP_Four.xlsm"
-    '    Call ExcelFileLooper(RequestItem, currentfile, ControlLocation)
-    '    currentfile = "2018_PSP_Five.xlsm"
-    '    Call ExcelFileLooper(RequestItem, currentfile, ControlLocation)
-    '    currentfile = "2018_PSP_Six.xlsm"
-    '    Call ExcelFileLooper(RequestItem, currentfile, ControlLocation)
-    '    currentfile = "2018_PSP_Combiner.xlsm"
-    '    Call ExcelFileLooper(RequestItem, currentfile, ControlLocation)
-    '    If EmailName = "Yes" Then
-    '        attachments = reply.Attachments
-    '        If File.Exists("\\Education.Vic.Gov.Au\SHARE\TMO\Projects\2017_PSP\Reports\All\" & Item_Found & "_Profile_2018.pdf") Then
-    '            attachments.Add("\\Education.Vic.Gov.Au\SHARE\TMO\Projects\2017_PSP\Reports\All\" & Item_Found & "_Profile_2018.pdf")
-    '        End If
-    '        reply.HTMLBody = reply.HTMLBody + "<br>Thank you for requesting a 2018 Provider Selection Process profile. <br><br>" &
-    '                             "Please find attached the 2018 selection profile, as it currently sits, for " & Item_Found & ".<br> <br>Your account has been billed: 
-    '									 $" & price & ". Your current balance is now $" & pricesum & ".<br><br><hr><P STYLE='font-family:Calbri;
-    '									 font-size:12'>If there was something else you were after, or if you have any suggestions - chat to Lance 
-    '									 Snell <br><br>"
-    '        reply.Send()
-    '        Call WaitOnSend()
-    '    End If
-    '
-    '    If DisplayModel = vbYes Then
-    '        currentfile = "SVTS_Reports.xlsm"
-    '        Call ReportingGo(RequestItem, currentfile, ControlLocation)
-    '
-    '    End If
-    'End Sub
-
-    Sub ReportingGo(RequestItem, CurrentFile, ControlLocation)
-
-        Dim sKill As String
-        Dim xxx As Integer = 0
-        Dim FromPath As String
-        Dim FSO As Object = CreateObject("scripting.filesystemobject")
-
-        If File.Exists(Desktop & CurrentFile) Then Kill(Desktop & CurrentFile)
-        FSO.CopyFile(Source:=ControlLocation & CurrentFile, Destination:=Desktop & CurrentFile)
-
-        Do While xxx < 2
-            sKill = "TASKKILL /F /IM EXCEL.EXE"
-            Shell(sKill, vbHide)
-            xxx = xxx + 1
-        Loop
-
-        Threading.Thread.Sleep(500)
-
-        On Error Resume Next
-
-        Dim objExcel = CreateObject("Excel.Application")
-        objExcel.Visable = True
-        objExcel.WindowState = vbMaximizedFocus
-        objExcel.Application.Workbooks.Open(Desktop & CurrentFile)
-        objExcel.DisplayAlerts = True
-
-        objExcel = Nothing
-
-        Threading.Thread.Sleep(500)
-
-    End Sub
-
     Sub CreateUplift(RequestItem As String)
 
         ControlLocation = "\\education.vic.gov.au\SHARE\TMO\Projects\RTOUplift\"
@@ -1140,6 +1136,7 @@ AccessProblem:
                         "<hr><P STYLE='font-family:Calbri;font-size:12'>If there was something else you were after, or if you have any suggestions - chat to Lance Snell <br><br>"
         reply.Send()
         Call WaitOnSend()
+        currentfile = ""
 
     End Sub
 
@@ -1152,7 +1149,7 @@ AccessProblem:
             ErrorMessage =
             "It appears that no information for this TOID/Request; OR the SVBI server is unresponsive." &
             "<Br><br>Please check your request and try again."
-            Call ErrorInEmails(RequestItem, ErrorMessage)
+            'Call ErrorInEmails(RequestItem, ErrorMessage)
             Exit Sub
         End If
 
@@ -1166,7 +1163,7 @@ AccessProblem:
         currentfile = "TMSRisk_Facts.xlsm"
         Call ExcelFileLooper(RequestItem, currentfile, ControlLocation)
 
-        currentfile = "TMSRisk_Leagues.xlsm"
+        currentfile = "TMSRisk_Leagues_New.xlsm"
         Call ExcelFileLooper(RequestItem, currentfile, ControlLocation)
 
         Directory.GetFiles(ControlLocation)
@@ -1176,7 +1173,7 @@ AccessProblem:
         Dim BulkFiles As String
         BulkFiles = "TMSRisk_RisksIR"
         For Each filenm As String In txtFiles
-            If filenm.ToUpper.Contains(BulkFiles.ToUpper) Then
+            If filenm.ToUpper.Contains(BulkFiles.ToUpper) And Left(filenm, 2) <> "~$" Then
                 currentfile = filenm
                 Call ExcelFileLooper(RequestItem, currentfile, ControlLocation)
             End If
@@ -1201,6 +1198,7 @@ AccessProblem:
 										 Snell <br><br>"
             reply.Send()
             Call WaitOnSend()
+            currentfile = ""
         End If
 
     End Sub
@@ -1226,7 +1224,7 @@ AccessProblem:
         currentfile = "TMSRisk_Facts.xlsm"
         Call ExcelFileLooper(RequestItem, currentfile, ControlLocation)
 
-        currentfile = "TMSRisk_Leagues.xlsm"
+        currentfile = "TMSRisk_Leagues_New.xlsm"
         Call ExcelFileLooper(RequestItem, currentfile, ControlLocation)
 
         Directory.GetFiles(ControlLocation)
@@ -1328,7 +1326,7 @@ AccessProblem:
     Private Const SETDESKWALLPAPER = 20
     Private Const UPDATEINIFILE = &H1
     Public Sub SetWallpaper(path)
-
+        Call LogStep(path, "Desktop")
         Dim sKill As String
         Dim xxx As Integer = 0
         Dim FromPath As String

@@ -32,7 +32,7 @@ Partial Class ControlForm
         '
         Me.Stopper.FlatAppearance.BorderColor = System.Drawing.Color.Maroon
         Me.Stopper.FlatAppearance.MouseDownBackColor = System.Drawing.Color.Maroon
-        Me.Stopper.Location = New System.Drawing.Point(13, 32)
+        Me.Stopper.Location = New System.Drawing.Point(456, 56)
         Me.Stopper.Margin = New System.Windows.Forms.Padding(4)
         Me.Stopper.Name = "Stopper"
         Me.Stopper.Size = New System.Drawing.Size(92, 33)
@@ -68,7 +68,7 @@ Partial Class ControlForm
         Me.Profile_Only.AutoSize = True
         Me.Profile_Only.Checked = True
         Me.Profile_Only.CheckState = System.Windows.Forms.CheckState.Checked
-        Me.Profile_Only.Location = New System.Drawing.Point(472, 40)
+        Me.Profile_Only.Location = New System.Drawing.Point(472, 32)
         Me.Profile_Only.Name = "Profile_Only"
         Me.Profile_Only.Size = New System.Drawing.Size(77, 17)
         Me.Profile_Only.TabIndex = 9
@@ -80,14 +80,14 @@ Partial Class ControlForm
         Me.AutoScaleDimensions = New System.Drawing.SizeF(6.0!, 13.0!)
         Me.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font
         Me.AutoValidate = System.Windows.Forms.AutoValidate.Disable
-        Me.ClientSize = New System.Drawing.Size(562, 68)
+        Me.ClientSize = New System.Drawing.Size(554, 92)
         Me.Controls.Add(Me.Profile_Only)
         Me.Controls.Add(Me.Button1)
         Me.Controls.Add(Me.RTOInformer_Location)
         Me.Controls.Add(Me.Stopper)
         Me.Name = "ControlForm"
         Me.RightToLeftLayout = True
-        Me.StartPosition = System.Windows.Forms.FormStartPosition.Manual
+        Me.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen
         Me.Text = "Admin Settings"
         Me.ResumeLayout(False)
         Me.PerformLayout()

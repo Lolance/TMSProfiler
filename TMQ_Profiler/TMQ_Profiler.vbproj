@@ -34,15 +34,15 @@
     <PublishUrl>\\education.vic.gov.au\SHARE\TMO\Projects\TMQ_ReProfiler\</PublishUrl>
     <InstallUrl>\\education.vic.gov.au\SHARE\TMO\Projects\TMQ_ReProfiler\</InstallUrl>
     <TargetCulture>en</TargetCulture>
-    <ApplicationVersion>3.0.0.10</ApplicationVersion>
+    <ApplicationVersion>4.0.0.26</ApplicationVersion>
     <AutoIncrementApplicationRevision>true</AutoIncrementApplicationRevision>
     <UpdateEnabled>true</UpdateEnabled>
     <UpdateInterval>1</UpdateInterval>
     <UpdateIntervalUnits>days</UpdateIntervalUnits>
-    <ProductName>TMQ_Profiler</ProductName>
+    <ProductName>TMS_Profiler</ProductName>
     <PublisherName>Lance Snell</PublisherName>
     <SupportUrl />
-    <FriendlyName>TMQ_Profiler</FriendlyName>
+    <FriendlyName>TMS_Profiler</FriendlyName>
     <OfficeApplicationDescription />
     <LoadBehavior>3</LoadBehavior>
   </PropertyGroup>
